@@ -1,6 +1,6 @@
-import { createApp } from 'vue'
-import App from './App.vue'
-import './assets/styles.css';
+import { createApp } from 'vue';
+import App from './App.vue';
+import './assets/styles.less';
 import JsonPretty from 'vue-json-pretty'
 import 'vue-json-pretty/lib/styles.css'
 

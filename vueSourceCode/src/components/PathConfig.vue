@@ -51,11 +51,14 @@ function handleInput() {
 
 
 window.addEventListener('message', (event) => {
+  console.log('页面vscode的postmessage:', event);
   const message = event.data
-  console.log('页面vscode的postmessage:', message);
   if (message.command === 'selectedPath') {
     console.log('页面接收到选中的路径:', message);
     emit('update:targetPath', message.data);
+  } else if (message.command === 'UPDATE_TARGET_PATH') {
+    console.log('页面接收到更新的目标路径:', message.data);
+    targetPathInput.value = message.data;
   }
 })
 </script>

@@ -1,8 +1,9 @@
 {
-  "name": "angularcg",
-  "displayName": "angularcg",
+  "name": "acg",
+  "displayName": "acg",
   "description": "",
   "version": "0.0.1",
+  "icon": "icon.png",
   "engines": {
     "vscode": "^1.101.0"
   },
@@ -14,10 +15,53 @@
   "contributes": {
     "commands": [
       {
-        "command": "angularcg.openConfig",
-        "title": "angularcg: openConfig"
+        "command": "acg.openConfig",
+        "title": "🏷️ acg: create"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "CG",
+      "properties": {
+        "cg.selectorPrefix": {
+          "type": "string",
+          "default": "yzf",
+          "description": "组件选择器前缀"
+        },
+        "cg.componentConfig": {
+          "type": "object",
+          "default": {
+            "pre": {
+              "generateModule": true
+            },
+            "basic": {
+              "componentName": "",
+              "selectorPrefix": "yzf"
+            },
+            "filters": {
+              "hasCompanyFilter": false,
+              "hasDateFilter": false,
+              "hasAdvancedFilter": false
+            },
+            "buttons": {
+              "hasAddButton": true,
+              "hasDeleteButton": true,
+              "hasImportButton": false,
+              "hasExportButton": false
+            }
+          },
+          "description": "组件生成配置"
+        }
+      }
+    },
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "acg.openConfig",
+          "group": "navigation",
+          "when": "explorerResourceIsFolder"
+        }
+      ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "pnpm run package",

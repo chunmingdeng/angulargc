@@ -1,0 +1,94 @@
+import { Injectable } from '@angular/core';
+import { RequestService } from 'src/app/utils/request.service';
+import { GlobalService } from 'src/app/services/global.service';
+@Injectable({
+    providedIn: 'root'
+})
+export class {{pascalCase moduleName}}Service {
+    constructor(
+        private ajax: RequestService,
+        public globalService: GlobalService
+    ) { }
+    prefix = '/coapi/cotax';
+
+    get{{pascalCase componentName}}List(params: any) {
+        const url = `${this.prefix}/{{moduleName}}/{{componentName}}/list`;
+        return this.ajax.request(url, {
+            method: 'post',
+            params: params
+        });
+    }
+    {{#if (or table.hasEditButton table.hasViewButton)}}
+    get{{pascalCase componentName}}Detail(id) {
+        const url = `${this.prefix}/{{moduleName}}/{{componentName}}/detail/${id}`;
+        return this.ajax.request(url, {
+            method: 'get',
+        });
+    }
+    {{/if}}
+    {{#if buttons.hasAddButton}}
+    add{{pascalCase componentName}}(params: any) {
+        const url = `${this.prefix}/{{moduleName}}/{{componentName}}/add`;
+        return this.ajax.request(url, {
+            method: 'post',
+            params: params
+        });
+    }
+    {{/if}}
+    {{#if table.hasEditButton}}
+    update{{pascalCase componentName}}(params: any) {
+        const url = `${this.prefix}/{{moduleName}}/{{componentName}}/update`;
+        return this.ajax.request(url, {
+            method: 'post',
+            params: params
+        });
+    }
+    {{/if}}
+    
+    {{#if (or buttons.hasDeleteButton table.hasDeleteButton)}}
+    delete{{pascalCase componentName}}(id) {
+        const url = `${this.prefix}/{{moduleName}}/{{componentName}}/delete/${id}`;
+        return this.ajax.request(url, {
+            method: 'post',
+        });
+    }
+    {{/if}}
+    
+    {{#if buttons.hasExportButton}}
+    exportAll{{pascalCase componentName}}(params: any) {
+        const url = `${this.prefix}/{{moduleName}}/{{componentName}}/exportAll`;
+        return this.ajax.request(url, {
+            method: 'post',
+            params: params
+        });
+    }
+    
+    exportSelect{{pascalCase componentName}}(params: any) {
+        const url = `${this.prefix}/{{moduleName}}/{{componentName}}/exportSelect`;
+        return this.ajax.request(url, {
+            method: 'post',
+            params: params
+        });
+    }
+    {{/if}}
+    
+    {{#if buttons.hasImportButton}}
+    import{{pascalCase componentName}}(params: any) {
+        const url = `${this.prefix}/{{moduleName}}/{{componentName}}/import`;
+        return this.ajax.request(url, {
+            method: 'post',
+            params: params
+        });
+    }
+    {{/if}}
+
+    {{#if (or buttons.hasBatchEnableButton table.hasEnableButton)}}
+    enable{{pascalCase componentName}}(params: any) {
+        const url = `${this.prefix}/{{moduleName}}/{{componentName}}/enable`;
+        return this.ajax.request(url, {
+            method: 'post',
+            params: params
+        });
+    }
+    {{/if}}
+  }

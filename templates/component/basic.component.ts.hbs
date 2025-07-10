@@ -1,0 +1,859 @@
+import { Component, OnInit, AfterViewInit, OnDestroy, TemplateRef, ViewChild } from '@angular/core';
+import { Subject, Subscription, debounceTime, distinctUntilChanged } from 'rxjs';
+import { NzMessageService } from 'ng-zorro-antd/message';
+import { NzModalService, NzModalRef } from 'ng-zorro-antd/modal';
+import { Debounce } from 'lodash-decorators';
+import { cloneDeep } from 'lodash-es';
+import dayjs from 'dayjs';
+{{#if table.hasEnhanceTable}}
+import { GetRowIdParams, ICellRendererParams, ValueFormatterParams } from 'ag-grid-community';
+import { 
+    EnhanceTableComponent, 
+    ColumnButtonRendererComponent, 
+    LongTextCellRendererComponent, 
+    TemplateCellRendererComponent, 
+    {{#if (and table.hasSelection table.hasCrossPageSelection)}}
+    TableSelectionManager,
+    EnhanceTableService,
+    {{/if}}
+    ColConfig, ColField, Formatters 
+} from '@/app/components/enhance-table/enhance-table.module';
+{{/if}}
+{{#if table.hasCrossPageSelection}}
+import { Throttle } from 'lodash-decorators';
+{{/if}}
+import { winResizeChange } from 'src/app/utils/decorators';
+import { GlobalService } from 'src/app/services';
+{{#if buttons.hasImportButton}}
+import { TaskAssignmentRespDTO, ImportType } from '@/app/types/tax-fcs/import/task-assignment-resp';
+import { taskObservable } from '@/app/utils/observableList';
+{{/if}}
+{{#if (and table.hasSelection table.hasCrossPageSelection)}}
+{{#unless table.hasEnhanceTable}}
+import { TableSelectionService, TableSelectionState } from '@/app/services/table-selection.service';
+{{/unless}}
+{{/if}}
+import { {{pascalCase moduleName}}Service } from '../{{moduleName}}.service';
+import { Examples, {{#if buttons.hasImportButton}}ImportMethods, {{/if}}{{#if (or buttons.hasBatchEnableButton table.hasEnableButton)}}EnableStatusList, {{/if}}arrayToMap } from '../{{moduleName}}.const';
+
+
+@winResizeChange
+@Component({
+    selector: '{{selectorPrefix}}-{{componentName}}',
+    templateUrl: './{{componentName}}.component.html',
+    styleUrls: ['./{{componentName}}.component.less']
+})
+export class {{pascalCase componentName}}Component implements OnInit, AfterViewInit, OnDestroy {
+{{#if table.hasEnhanceTable}}
+    @ViewChild('exampleTpl', { static: false }) exampleTpl: TemplateRef<any>;
+    @ViewChild('buttonTpl', { static: false }) buttonTpl: TemplateRef<any>;
+    {{#if table.hasCrossPageSelection}}
+    @ViewChild('selectionDropdownTpl', { static: false }) selectionDropdownTpl: TemplateRef<any>;
+    {{/if}}
+{{/if}}
+    innerPageH = 800; // 内页高度
+    tableHeight = 500; // 表格高度
+{{#if filters.hasDateFilter}}
+    date: Date;
+    startDate = null;
+{{/if}}
+{{#if filters.hasCompanyFilter}}
+    // 企业筛选
+    allCorporationList: any[] = [];
+    corporationTree: any[] = []; // 集团公司树
+    selectedCorporationTree: any[] = []; // 集团公司树
+{{/if}}
+{{#if (or filters.hasCompanyFilter buttons.hasBatchFilterButton)}}
+    corporationValue: string[] = []; // 选中的集团公司
+    companyIds: any[] = [];
+{{/if}}
+{{#if filters.hasInputFilter}}
+    {{camelCase componentName}}CodeOrName = '';
+{{/if}}
+{{#if filters.hasAdvancedFilter}}
+    // 高级筛选
+    queryParmetes = {
+      exampleFilter: null,
+    };
+    isOpenSearch = false;
+    {{#if (eq filters.advancedFilterType 'legacy')}}
+    searchNum = 0;
+    filterBadgeObj = {
+        exampleFilter: {
+            type: 'select',
+            width: 120,
+            placeHolder: 'exampleFilter',
+            condition: cloneDeep(Examples)
+        },
+    };
+    {{else if (eq filters.advancedFilterType 'new')}}
+    filterBadgeObj = [
+        {
+            title: "示例",
+            keyName: "exampleFilter",
+            type: "select", 
+            options: cloneDeep(Examples),
+            keyValue: null,
+        },
+    ];
+    {{/if}}
+{{/if}}
+
+    // 表格
+    listOfData: any[] = [];
+    pageNumber = 1;
+    pageSize = 30;
+    total = 0;
+    tableLoading = false;
+{{#if table.hasSelection}}
+    getRowKey = (row)=> `${row.companyId}-${row.id}`;
+    {{#if table.hasCrossPageSelection}}
+    {{#if table.hasEnhanceTable}}
+    selectionManager: TableSelectionManager;
+    {{else}}
+    // 表格选择状态
+    selectionState: TableSelectionState;
+    {{/if}}
+    listOfSelection = [
+        {
+            text: '全选全部页',
+            onSelect: () => {
+                if (this.listOfData.length === 0) return;
+                this.checkAllPages(true);
+            },
+        },
+        {
+            text: '取消全选',
+            onSelect: () => {
+                this.checkAllPages(false);
+            }
+        }
+    ];
+    {{else}}
+    {{#unless table.hasEnhanceTable}}
+    isIndeterminate = false;
+    mapOfCheckedId: { [key: string]: boolean } = {};
+    isAllDataChecked: boolean;
+    {{/unless}}
+    checkedRows: any[] = [];
+    {{/if}}
+{{/if}}
+{{#if table.hasEnhanceTable}}
+    {{#if table.hasSelection}}
+    /** 确定每一行数据唯一性的字段 */
+    getRowId = (params: GetRowIdParams) => this.getRowKey(params.data);
+    {{/if}}
+    private enhanceTable: EnhanceTableComponent;
+    public columnDefs: ColConfig[] = [];
+    public baseColumnDefs: ColConfig[] = [
+    {{#if table.hasSelection}}
+        {
+            field: ColField.SELECT,
+            headerName: '选择',
+            checkboxSelection: true,
+            headerCheckboxSelection: true,
+            showDisabledCheckboxes: true,
+            pinned: 'left',
+            lockPosition: true,
+            width: 50,
+            resizable: false,
+            {{#if table.hasCrossPageSelection}}
+            headerComponentParams: {
+                content: () => {
+                    return this.selectionDropdownTpl;
+                }
+            },
+            {{/if}}
+        },
+    {{/if}}
+        {
+            field: 'companyCode',
+            headerName: '企业编码',
+            width: 120,
+            pinned: 'left',
+        },
+        {
+            field: 'companyName',
+            headerName: '企业名称',
+            tooltipField: 'companyName',
+            width: 260,
+            pinned: 'left',
+            cellRendererSelector: (rp: ICellRendererParams) => {
+                return {
+                    component: LongTextCellRendererComponent,
+                    params: {
+                        content: rp.value,
+                        taxlayerType: rp.data.taxlayerType || rp.data.taxLayerType,
+                        enableCopyIcon: true,
+                    }
+                };
+            }
+        },
+        {
+            field: 'exampleName',
+            headerName: '示例名称',
+            tooltipField: 'exampleName',
+            width: 120,
+            minWidth: 120,
+            valueFormatter: Formatters.PlainText(),
+        },
+        {
+            field: 'exampleEnumCode',
+            headerName: '示例枚举名称',
+            width: 150,
+            minWidth: 120,
+            align: 'right',
+            valueFormatter: Formatters.LabelValue(Examples),
+        },
+        {
+            field: 'exampleNumber',
+            headerName: '示例数字/金额名称',
+            width: 120,
+            minWidth: 120,
+            align: 'right',
+            valueFormatter: Formatters.Number(),
+        },
+        {
+            field: 'exampleDate',
+            headerName: '示例日期',
+            width: 120,
+            minWidth: 120,
+            valueFormatter: Formatters.Date(),
+        },
+        {
+            field: 'exampleTemplateRef',
+            headerName: '示例模板',
+            width: 120,
+            minWidth: 120,
+            cellRendererSelector: (rp: ICellRendererParams) => {
+                return {
+                    component: TemplateCellRendererComponent,
+                    params: {
+                        content: this.exampleTpl,
+                        contentParams: {
+                            rowData: rp.data
+                        }
+                    },
+                };
+            }
+        },
+        {
+            field: 'exampleValueFormatter',
+            headerName: '示例自定义格式化',
+            width: 120,
+            minWidth: 120,
+            valueFormatter: (params: ValueFormatterParams) => {
+                return params.value + ' 自定义格式化';
+            },
+        },
+        {
+            field: 'operation',
+            headerName: '操作',
+            width: 240,
+            minWidth: 160,
+            pinned: 'right',
+            disabled: false,
+            cellRendererSelector: (rp: ICellRendererParams) => {
+                return {
+                    component: ColumnButtonRendererComponent,
+                    params: {
+                        buttons: this.buttonTpl,
+                        buttonParams: {
+                            rowData: rp.data
+                        }
+                    },
+                };
+            }
+        },
+    ]
+{{/if}}
+{{#if (or buttons.hasAddButton table.hasEditButton table.hasViewButton)}}
+    // 弹窗
+    nyDrawerShow = false;
+    drawerName = '';
+    infoData = null;
+    infoType = 'add';
+{{/if}}
+{{#if buttons.hasImportButton}}
+    // 导入
+    importData = {
+        url: '/{{camelCase componentName}}/import',
+        template: {
+            name: '{{#if businessName}}{{businessName}}{{else}}xxx{{/if}}导入模板',
+            type: '{{upperSnakeCase componentName}}_TEMPLATE',
+        },
+        uploadType: 'UPLOAD_OTHER', // 上传类型
+        importMethods: ImportMethods
+
+    }
+    importVisible: boolean;
+    private importSubscription: Subscription;
+{{/if}}
+    // 常量
+    exampleMap = arrayToMap(Examples);
+{{#if (or buttons.hasBatchEnableButton table.hasEnableButton)}}
+    enableStatusMap = arrayToMap(EnableStatusList);
+{{/if}}
+{{#if table.hasPolling}}
+    refreshInterval;
+{{/if}}
+
+    constructor(
+        public globalService: GlobalService,
+        private modalService: NzModalService,
+        private message: NzMessageService,
+        private service: {{pascalCase moduleName}}Service,
+        {{#if table.hasCrossPageSelection}}
+        {{#if table.hasEnhanceTable}}
+        private enhanceTableService: EnhanceTableService,
+        {{else}}
+        private tableSelectionService: TableSelectionService,
+        {{/if}}
+        {{/if}}
+    ) {
+    {{#if buttons.hasImportButton}}
+        this.handImportListener();
+    {{/if}}
+    {{#if (and table.hasSelection table.hasCrossPageSelection)}}
+        {{#if table.hasEnhanceTable}}
+        this.selectionManager = this.enhanceTableService.createSelectionManager(this.getRowKey);
+        {{else}}
+        // 初始化选择状态
+        this.selectionState = this.tableSelectionService.initSelectionState(this.getRowKey);
+        {{/if}}
+    {{/if}}
+
+    }
+
+    ngOnInit(): void {
+    {{#if filters.hasDateFilter}}
+        this.setDate();
+    {{/if}}
+    {{#if filters.hasCompanyFilter}}
+        this.initAllCorporationList();
+    {{/if}}
+        this.refreshData(true);
+    }
+
+    ngAfterViewInit(): void { }
+    ngOnDestroy() {
+    {{#if buttons.hasImportButton}}
+        this.importSubscription?.unsubscribe();
+    {{/if}}
+    }
+{{#if buttons.hasImportButton}}
+    handImportListener() {
+        this.importSubscription = taskObservable().subscribe((message: TaskAssignmentRespDTO) => {
+            const { type, status } = message;
+            if (type === ImportType.IMPORT_TAX_COMMON_FCS_PROPERTY_SOURCE_INFO) {
+                if (status === 2) {
+                    this.refreshData();
+                } else if (status === 3) {
+                    this.message.error('导入失败！');
+                }
+            }
+        });
+    }
+{{/if}}
+{{#if filters.hasDateFilter}}
+    setDate() {
+        let year: number = Number(localStorage.getItem('accountingYear'));
+        let month: number = Number(localStorage.getItem('accountingMonth'));
+        if (year && month) {
+            const prevDate = dayjs(`${year}-${month}-01`).toDate();
+            this.date = prevDate;
+        } else {
+            const date = dayjs(this.globalService.userData.sysdate).toDate();
+            year = date.getFullYear();
+            month = date.getMonth() + 1;
+            const prevDate = new Date(year, month - 1, 0);
+            this.date = prevDate;
+        }
+    }
+    // 日期禁选控制
+    disabledDate = (current: Date): boolean => {
+        const sysdate = dayjs(this.globalService.userData.sysdate).toDate();
+        const kjnd = sysdate.getFullYear();
+        const kjqj = sysdate.getMonth() + 1;
+        const time = new Date(current.getFullYear(), current.getMonth(), 1).getTime();
+        const startDate = dayjs(this.startDate).toDate();
+        return time > new Date(kjnd, kjqj, 0).getTime() ||
+            time < new Date(startDate.getFullYear(), startDate.getMonth(), 0).getTime();
+    }
+{{/if}}
+{{#if filters.hasAdvancedFilter}}
+    seniorSearch() {
+        this.isOpenSearch = !this.isOpenSearch;
+        this.ngAfterViewInit();
+    }
+    {{#if (eq filters.advancedFilterType 'legacy')}}
+    selectChange(obj) {
+        for (const key of Object.keys(this.filterBadgeObj)) {
+              if (key === 'dateRange') {
+                  this.queryParmetes['xxxStartDate'] = obj[key] ? dayjs(obj[key].value[0]).format('YYYY-MM-DD') : null;
+                  this.queryParmetes['xxxEndDate'] = obj[key] ? dayjs(obj[key].value[1]).format('YYYY-MM-DD') : null;
+              } else {
+                  if (Array.isArray(obj[key])) {
+                      this.queryParmetes[key] = obj[key] ? obj[key].map(item => item.value) : null;
+                  } else {
+                      this.queryParmetes[key] = obj[key] ? obj[key].value : null;
+                  }
+              }
+        }
+        this.searchNum = Object.keys(obj).length;
+        this.refreshData(true);
+    }
+    {{else if (eq filters.advancedFilterType 'new')}}
+    @Debounce(500)
+    advancedfilterChange(conditons: any[]) {
+        console.log('conditons:', conditons);
+        conditons.forEach(conditon => {
+            this.queryParmetes[conditon.keyName] = conditon.keyValue;
+            const filterCondition = this.filterBadgeObj.find(item => item.keyName === conditon.keyName);
+            if (filterCondition) {
+                filterCondition.keyValue = conditon.keyValue;
+            }
+        })
+        this.ngAfterViewInit();
+        this.refreshData(true);
+
+    }
+    filterBoxSizeChange() {
+        this.ngAfterViewInit();
+    }
+    {{/if}}
+{{/if}}
+{{#if filters.hasInputFilter}}
+    @Debounce(500)
+    keyupSearchFunc(e) {
+        this.refreshData(true);
+    }
+{{/if}}
+{{#if filters.hasCompanyFilter}}
+    // 改变选中的集团树
+    onTagChange($event: string[]): void {
+        this.companyIds = $event;
+        this.getTableData(true);
+    }
+    // 获取所有企业
+    initAllCorporationList() {
+        this.globalService.initCompanyList().then((res) => {
+            if (res.code === '0') {
+                this.allCorporationList = res.result || [];
+            }
+        });
+    }
+{{/if}}
+{{#if buttons.hasBatchFilterButton}}
+    onBatchSelectChange(data: any) {
+        this.corporationValue = data.map(item => item.companyId);
+        this.companyIds = this.corporationValue;
+        this.getTableData(true);
+    }
+{{/if}}
+    getQueryObj() {
+        const queryObj = {
+        {{#if filters.hasDateFilter}}
+            period: this.date ? dayjs(this.date).format('YYYY-MM') : null,
+            kjnd: this.date ? dayjs(this.date).year() : null,
+            kjqj: this.date ? dayjs(this.date).month() + 1 : null,
+        {{/if}}
+        {{#if filters.hasCompanyFilter}}
+            companyIds: this.companyIds,
+        {{/if}}
+        {{#if filters.hasInputFilter}}
+            {{camelCase componentName}}CodeOrName: this.{{camelCase componentName}}CodeOrName;
+        {{/if}}
+        {{#if filters.hasAdvancedFilter}}
+            ...this.queryParmetes,
+        {{/if}}
+            tenantId: this.globalService.userData.tenantId,
+            userId: this.globalService.userData.userId,
+        };
+        return queryObj;
+    }
+    // 获取列表数据
+    getTableData(isFirst: boolean = false) {
+    {{#if table.hasPolling}}
+        if (this.refreshInterval) {
+            clearInterval(this.refreshInterval);
+            this.refreshInterval = null;
+        }
+    {{/if}}
+        if (isFirst) {
+            this.pageNumber = 1;
+        }
+        this.tableLoading = true;
+        const params = Object.assign({}, this.getQueryObj(), {
+            pageNumber: this.pageNumber,
+            pageSize: this.pageSize,
+        });
+        this.service.get{{pascalCase componentName}}List(params).then(result => {
+            this.listOfData = result.data || [];
+            this.total = result.total;
+        {{#if (and table.hasSelection table.hasCrossPageSelection)}}
+            {{#if table.hasEnhanceTable}}
+            // 恢复选中状态
+            this.selectionManager.setTableSelection(this.enhanceTable);
+            {{else}}
+            // 恢复选中状态
+            this.restoreCheckStatus();
+            {{/if}}
+        {{/if}}
+        {{#if table.hasPolling}}
+            if (this.needPolling(this.listOfData)) {
+                this.refreshListInterval();
+            }
+        {{/if}}
+        }).catch(() => {
+            this.listOfData = [];
+            this.total = 0;
+        }).finally(() => {
+            this.tableLoading = false;
+        });
+    }
+{{#if table.hasPolling}}
+    refreshListInterval() {
+        if (this.refreshInterval) {
+            clearInterval(this.refreshInterval);
+            this.refreshInterval = null;
+        }
+        const params = Object.assign({}, this.getQueryObj(), {
+            pageNumber: this.pageNumber,
+            pageSize: this.pageSize,
+        });
+
+        this.refreshInterval = setInterval(() => {
+            this.service.get{{pascalCase componentName}}List(params).then(result => {
+                this.listOfData = result.data || [];
+                this.total = result.total;
+            {{#if (and table.hasSelection table.hasCrossPageSelection)}}
+                {{#if table.hasEnhanceTable}}
+                // 恢复选中状态
+                this.selectionManager.setTableSelection(this.enhanceTable);
+                {{else}}
+                // 恢复选中状态
+                this.restoreCheckStatus();
+                {{/if}}
+            {{/if}}
+                if (this.needPolling(this.listOfData)) {
+                    this.refreshListInterval();
+                }
+            }).catch(() => {
+                this.listOfData = [];
+                this.total = 0;
+            })
+        }, 5000);
+    }
+    needPolling(data: any[]): boolean {
+        return data.some(item => [item.xxxStatus].includes(1));
+    }
+{{/if}}
+{{#if table.hasEnhanceTable}}
+    onGridReady(enhanceTableComponent: EnhanceTableComponent) {
+        this.enhanceTable = enhanceTableComponent;
+        this.columnDefs = cloneDeep(this.baseColumnDefs);
+        // this.getTableHeader();
+    }
+{{/if}}
+{{#if (and table.hasEnhanceTable table.hasSelection)}}
+    onSelectionChanged(selectedRows: any[]) {
+        {{#if table.hasCrossPageSelection}}
+        this.selectionManager.handleSelectionChange(selectedRows, this.listOfData);
+        {{else}}
+        this.checkedRows = selectedRows;
+        {{/if}}
+    }
+{{/if}}
+{{#if table.hasCrossPageSelection}}
+    /**
+     * 刷新数据
+     * @param isFirst 是否回到第一页, 默认不回
+     * @param clearSelection 是否清空勾选状态
+     */
+    refreshData(isFirst: boolean = false, clearSelection: boolean = true): void {
+    {{#if table.hasSelection}}
+        {{#if table.hasEnhanceTable}}
+        if (clearSelection) {
+            this.selectionManager.checkAllPages(false);
+        }
+        {{else}}
+        this.tableSelectionService.handleRefreshData(this.selectionState, this.listOfData, clearSelection);
+        {{/if}}
+    {{/if}}
+        this.getTableData(isFirst);
+    }
+{{else}}
+    // 更新数据
+    refreshData(isFirst: boolean = false): void {
+    {{#if table.hasSelection}}
+        {{#if table.hasEnhanceTable}}
+        this.enhanceTable?.clearSelection();
+        {{else}}
+        this.clearTableChecked();
+        {{/if}}
+    {{/if}}
+        this.getTableData(isFirst);
+    }
+{{/if}}
+{{#if table.hasCrossPageSelection}}
+    {{#if table.hasSelection}}
+    {{#if table.hasEnhanceTable}}
+    // 全选所有页
+    checkAllPages(checked: boolean) {
+        this.selectionManager.checkAllPages(checked);
+        if (checked) {
+            this.enhanceTable.batchSetSeletStatus(
+                this.enhanceTable.getAllNodes(),
+                true
+            );
+        } else {
+            this.enhanceTable.clearSelection();
+        }
+    }
+    // 选中数量计算属性
+    @Throttle(1000)
+    get selectedCount(): number {
+        return this.selectionManager.getSelectedCount(this.total);
+    }
+    {{else}}
+    // 恢复选中状态
+    restoreCheckStatus(): void {
+        this.tableSelectionService.restoreCheckStatus(this.selectionState, this.listOfData);
+    }
+    // 全选当前页
+    checkCurrentPage(value: boolean): void {
+        this.tableSelectionService.checkCurrentPage(this.selectionState, value, this.listOfData);
+    }
+    // 单个选择
+    onItemChecked(id: string, checked: boolean): void {
+        this.tableSelectionService.onItemChecked(this.selectionState, id, checked, this.listOfData);
+    }
+    // 全选所有页
+    checkAllPages(value: boolean): void {
+        this.tableSelectionService.checkAllPages(this.selectionState, value, this.listOfData);
+    }
+    // 选中数量计算属性
+    @Throttle(1000)
+    get selectedCount(): number {
+        return this.tableSelectionService.getSelectedCount(this.selectionState, this.total);
+    }
+    {{/if}}
+    {{/if}}
+{{else}}
+
+    {{#if table.hasSelection}}
+    {{#unless table.hasEnhanceTable}}
+    // 全选id
+    checkAll(value: boolean): void {
+        this.listOfData.forEach(item => (this.mapOfCheckedId[this.getRowKey(item)] = value));
+        this.refreshStatus();
+    }
+
+    // 选中表格数据
+    refreshStatus(): void {
+        this.isAllDataChecked = this.listOfData.length > 0 && this.listOfData.every(item => this.mapOfCheckedId[this.getRowKey(item)]);
+        this.isIndeterminate = this.listOfData.some(item => this.mapOfCheckedId[this.getRowKey(item)]) && !this.isAllDataChecked;
+        this.checkedRows = this.listOfData.filter(item => this.mapOfCheckedId[this.getRowKey(item)]);
+    }
+
+    // 清除table checked缓存
+    clearTableChecked() {
+        this.isAllDataChecked = false;
+        this.isIndeterminate = false;
+        this.checkedRows = [];
+        this.mapOfCheckedId = {};
+    }
+    {{/unless}}
+    {{/if}}
+{{/if}}
+{{#if buttons.hasAddButton}}
+    handleAdd() {
+        this.drawerName = '新增{{#if businessName}}{{businessName}}{{/if}}';
+        this.infoData = null;
+        this.infoType = 'add';
+        this.nyDrawerShow = true;  
+    }
+{{/if}}
+{{#if table.hasEditButton}}
+    handleEdit(data) {
+        this.drawerName = '编辑{{#if businessName}}{{businessName}}{{/if}}';
+        this.infoData = data;
+        this.infoType = 'edit';
+        this.nyDrawerShow = true;
+    }
+{{/if}}
+{{#if table.hasViewButton}}
+    handleView(data) {
+        this.drawerName = '详情';
+        this.infoData = data;
+        this.infoType = 'view';
+        this.nyDrawerShow = true;
+    }
+{{/if}}
+{{#if (and table.hasSelection buttons.hasDeleteButton)}}
+    handleBatchDelete() {
+        {{#if table.hasCrossPageSelection}}
+        {{#if table.hasEnhanceTable}}
+        const { allSelected, selectedData, excludeIds } = this.selectionManager.getSelectedRows();
+        {{else}}
+        const { allSelected, selectedData, excludeIds } = this.tableSelectionService.getSelectedRows(this.selectionState);
+        {{/if}}
+        if (selectedData.length === 0) {
+            this.message.warning('请选择要删除的数据');
+            return;
+        }
+        const params = {
+            selectAllFlag: allSelected,
+            excludeIds,
+            ids: allSelected ? [] : selectedData.map(item => item.id),
+            tenantId: this.globalService.userData.tenantId,
+            userId: this.globalService.userData.userId, 
+        }
+        {{else}}
+        if (this.checkedRows.length === 0) {
+            this.message.warning('请选择要删除的数据');
+            return;
+        }
+        const params = {
+            ids: this.checkedRows.map(item => item.id),
+            tenantId: this.globalService.userData.tenantId,
+            userId: this.globalService.userData.userId, 
+        }
+        {{/if}}
+        this.service.delete{{pascalCase componentName}}(params).then(res => {
+            this.message.success('删除成功！');
+            this.getTableData();
+        });
+    }
+
+{{/if}}
+{{#if table.hasDeleteButton}}
+    handleDelete(data) {
+        const params = {
+            ids: [data.id],
+            tenantId: this.globalService.userData.tenantId,
+            userId: this.globalService.userData.userId, 
+        }
+        this.service.delete{{pascalCase componentName}}(params).then(res => {
+            this.message.success('删除成功！');
+            this.getTableData();
+        });
+    }
+
+{{/if}}
+{{#if buttons.hasBatchEnableButton}}
+    @Debounce(500)
+    handleBatchEnable(enable: boolean) {
+        const enableText = enable ? '启用' : '禁用';
+        {{#if table.hasCrossPageSelection}}
+        {{#if table.hasEnhanceTable}}
+        const { allSelected, selectedData, excludeIds } = this.selectionManager.getSelectedRows();
+        {{else}}
+        const { allSelected, selectedData, excludeIds } = this.tableSelectionService.getSelectedRows(this.selectionState);
+        {{/if}}
+        if (selectedData.length === 0) {
+            this.message.warning(`请选择要${enableText}的数据`);
+            return;
+        }
+        const params = {
+            selectAllFlag: allSelected,
+            excludeIds,
+            ids: allSelected ? [] : selectedData.map(item => item.id),
+            enable: enable ? 1 : 0,
+            tenantId: this.globalService.userData.tenantId,
+            userId: this.globalService.userData.userId, 
+        }
+        {{else}}
+        if (this.checkedRows.length === 0) {
+            this.message.warning(`请选择要${enableText}的数据`);
+            return;
+        }
+        const params = {
+            ids: this.checkedRows.map(item => item.id),
+            enable: enable ? 1 : 0,
+            tenantId: this.globalService.userData.tenantId,
+            userId: this.globalService.userData.userId, 
+        }
+        {{/if}}
+        this.service.enable{{pascalCase componentName}}(params).then(res => {
+            this.message.success(`${enableText}成功！`);
+            this.getTableData();
+        });
+    }
+
+{{/if}}
+{{#if table.hasEnableButton}}
+    @Debounce(500)
+    handleEnable(data, enable: boolean) {
+        const enableText = enable ? '启用' : '禁用';
+        const params = {
+            ids: [data.id],
+            enable: enable ? 1 : 0,
+            tenantId: this.globalService.userData.tenantId,
+            userId: this.globalService.userData.userId, 
+        }
+        this.service.enable{{pascalCase componentName}}(params).then(res => {
+            this.message.success(`${enableText}成功！`);
+            this.getTableData();
+        });
+    }
+{{/if}}
+{{#if (or buttons.hasAddButton table.hasEditButton table.hasViewButton)}}
+    closeDrawer() {
+        this.nyDrawerShow = false;
+    }
+    successEvent(value) {
+        if (value === 'success' || value === 'successAdd') {
+            this.getTableData();
+        }
+        this.closeDrawer();
+    }
+{{/if}}
+{{#if buttons.hasImportButton}}
+    doUpload() {
+        this.uploadComponent.showModal();
+        this.importVisible = true;
+    }
+{{/if}}
+
+{{#if buttons.hasExportButton}}
+    allExport(badgeAnimation?) {
+        this.message.info('正在导出中!');
+        badgeAnimation?.onStart(badgeAnimation);
+        const params = Object.assign({}, this.getQueryObj());
+        this.service.exportAll{{pascalCase componentName}}(params);
+    }
+    batchExport(badgeAnimation) {
+        {{#if table.hasCrossPageSelection}}
+        {{#if table.hasEnhanceTable}}
+        const { allSelected, selectedData, excludeIds } = this.selectionManager.getSelectedRows();
+        {{else}}
+        const { allSelected, selectedData, excludeIds } = this.tableSelectionService.getSelectedRows(this.selectionState);
+        {{/if}}
+        if (selectedData.length === 0) {
+            this.message.warning('请选择要导出的数据');
+            return;
+        }
+        this.message.info('正在导出中!');
+        badgeAnimation.onStart(badgeAnimation);
+        const params = Object.assign({}, this.getQueryObj(), {
+            selectAllFlag: allSelected,
+            excludeIds,
+            ids: allSelected ? [] : selectedData.map(item => item.id),
+        });
+        {{else}}
+        if (this.checkedRows.length === 0) {
+            this.message.warning('请选择要导出的数据');
+            return;
+        }
+        this.message.info('正在导出中!');
+        badgeAnimation.onStart(badgeAnimation);
+        const params = Object.assign({}, this.getQueryObj(), {
+            ids: this.checkedRows.map(row => row.id)
+        });
+        {{/if}}
+        this.service.exportSelect{{pascalCase componentName}}(params);
+    }
+{{/if}}
+}

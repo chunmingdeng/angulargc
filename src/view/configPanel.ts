@@ -129,7 +129,7 @@ export class ConfigPanel {
                         }
 
                         // 保存配置
-                        await vscode.workspace.getConfiguration('cgat').update('componentConfig', config, vscode.ConfigurationTarget.Global);
+                        await vscode.workspace.getConfiguration('cg').update('componentConfig', config, vscode.ConfigurationTarget.Global);
 
                         // 检查目标路径是否已经存在模块文件
                         let existingModulePath = this._existingModulePath;
@@ -192,6 +192,12 @@ export class ConfigPanel {
             undefined,
             context.subscriptions
         );
+
+        this._targetPath &&
+            this._panel.webview.postMessage({
+                command: 'UPDATE_TARGET_PATH',
+                data: this._targetPath,
+            });
     }
 
     public static show(
