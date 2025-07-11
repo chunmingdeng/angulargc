@@ -154,7 +154,7 @@ export class ComponentGenerator extends BaseGenerator {
     };
 
     // 确定正确的模块名称
-    let moduleName = config.pre.moduleName || config.basic.componentName;
+    let moduleName = config.pre.moduleName || paramCase(config.basic.componentName);
 
     // 如果不生成模块但有现有模块，使用现有模块的名称
     if (!config.pre.generateModule && this.existingModulePath) {
@@ -196,7 +196,7 @@ export class ComponentGenerator extends BaseGenerator {
       pascalCaseComponentName: pascalCase(config.basic.componentName),
       selectorPrefix: config.basic.selectorPrefix,
       generateModule: config.pre.generateModule,
-      moduleName: moduleName, // 使用正确的模块名称
+      moduleName: paramCase(moduleName), // 使用正确的模块名称
       businessName: config.basic.businessName,
       filters: config.filters,
       buttons: config.buttons,
@@ -232,6 +232,11 @@ export class ComponentGenerator extends BaseGenerator {
         { template: 'const/basic.const.ts.hbs', output: `${data.moduleName}/${data.moduleName}.const.ts` }
       ];
       files.push(...moduleFiles);
+    } else {
+      files.push(
+        { template: 'service/basic.service.ts.hbs', output: `${baseComponentPath}.service.ts` },
+        { template: 'const/basic.const.ts.hbs', output: `${baseComponentPath}.const.ts` }
+      );
     }
 
     // 添加详情组件文件

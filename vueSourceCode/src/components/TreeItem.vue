@@ -1,40 +1,25 @@
 <template>
   <div class="tree-item" role="treeitem" aria-expanded="false">
-    <span 
-      :class="[
-        'node',
-        isRoot ? 'root' : '',
-        isFolder ? 'folder' : 'file',
-        isExisting ? 'existing' : ''
-      ]"
-    >
+    <span :class="[
+      'node',
+      isRoot ? 'root' : '',
+      isFolder ? 'folder' : 'file',
+      isExisting ? 'existing' : ''
+    ]">
       {{ name }}<template v-if="isFolder">/</template>
     </span>
-    
+
     <div v-if="isFolder && !isExisting" class="children" role="group">
-      <div 
-        v-for="(childValue, childName) in value" 
-        :key="childName" 
-        class="child-item"
-      >
-        <TreeItem
-          v-if="typeof childValue === 'object' && !Array.isArray(childValue)"
-          :name="childName"
-          :value="childValue"
-        />
-        <div 
-          v-else-if="childValue === 'file' || (typeof childValue === 'object' && childValue._existing)" 
-          class="file-item"
-          role="treeitem"
-        >
-          <span
-            :class="[
-              'node',
-              isRoot ? 'root' : '',
-              typeof childValue === 'object' && childValue._existing ? 'existing' : '',
-              isFolder ? 'folder' : 'file'
-            ]"
-          >
+      <div v-for="(childValue, childName) in value" :key="childName" class="child-item">
+        <TreeItem v-if="typeof childValue === 'object' && !Array.isArray(childValue)" :name="childName"
+          :value="childValue" />
+        <div v-else-if="childValue === 'file' || (typeof childValue === 'object' && childValue._existing)"
+          class="file-item" role="treeitem">
+          <span :class="[
+            'node',
+            isRoot ? 'root' : '',
+            typeof childValue === 'object' && childValue._existing ? 'existing' : '',
+          ]">
             {{ childName }}
           </span>
         </div>
@@ -85,6 +70,7 @@ const isFolder = computed(() => {
   padding: 2px 4px;
   border-radius: 4px;
   cursor: default;
+  color: #333;
 }
 
 .folder {
@@ -127,5 +113,20 @@ const isFolder = computed(() => {
 /* 根节点悬停效果 */
 .root:hover {
   background-color: rgba(198, 40, 40, 0.1);
+}
+
+.node.folder {
+  font-weight: bold;
+  background-color: #2e7d32;
+  color: #fff;
+}
+.tree-item {
+  position: relative;
+  &::before {
+    content: '-📁 ';
+    position: absolute;
+    left: -31px;
+    top: 4px;
+  }
 }
 </style>

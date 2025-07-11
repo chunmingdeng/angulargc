@@ -5,7 +5,7 @@
       <label>目标路径：</label>
       <!-- <span v-if="targetPath" id="targetPath">{{ targetPath }}</span> -->
       <div class="path-input">
-        <input type="text" v-model="targetPathInput" required @input="handleInput" disabled/>
+        <input type="text" v-model="targetPathInput" required @input="handleInput" disabled />
         <button type="button" id="selectPath" @click="handleSelectPath">选择路径</button>
       </div>
     </div>
@@ -68,6 +68,7 @@ window.addEventListener('message', (event) => {
   display: flex;
   gap: 10px;
 }
+
 input[type="text"] {
   flex: 1;
 }

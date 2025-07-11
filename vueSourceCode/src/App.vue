@@ -5,7 +5,7 @@
       <PathConfig v-model:target-path="targetPath" />
       <BaseSettings v-model:data="baseSettings" />
       <TabSettings v-model:data="pageSettings" />
-      <FilePreview :structure="fileStructure" />
+      <FilePreview :structure="fileStructure" style="position: fixed;top: 0; right: 0;" />
 
       <div class="button-group">
         <button type="submit" id="saveConfig">保存配置</button>
@@ -28,6 +28,7 @@ import PathConfig from './components/PathConfig.vue';
 import BaseSettings from './components/BaseSettings.vue';
 import TabSettings from './components/TabSettings.vue';
 import FilePreview from './components/FilePreview.vue';
+import { kebabCase } from 'change-case'
 const { proxy } = getCurrentInstance();
 
 // 表单数据
@@ -58,7 +59,7 @@ function handleGenerateComponent() {
     ...toRaw(baseSettings.value),
     ...toRaw(pageSettings.value)
   });
-  const { filterConfig, buttonConfig, tableConfig} = pageSettings.value
+  const { filterConfig, buttonConfig, tableConfig } = pageSettings.value
   // 如果在 VS Code 环境中，发送消息到扩展
   proxy?.vscode.postMessage({
     command: 'generateComponent',
@@ -70,42 +71,27 @@ function handleGenerateComponent() {
   });
 }
 
-
-// 计算属性 - 文件结构
 const fileStructure = computed(
   () => baseSettings.value
     ? buildFileStructure()
     : {});
 
 watch([baseSettings, pageSettings, targetPath], () => {
-  // 当 baseSettings、pageSettings 或 targetPath 变化时，重新计算文件结构
   fileStructure.value = buildFileStructure();
 }, { deep: true, immediate: false });
-
-
-// function handleSelectPath() {
-//   // 模拟选择路径功能
-//   const mockPath = prompt('请输入目标路径:', '/project/src/components');
-//   if (mockPath !== null) {
-//     targetPath.value = mockPath;
-//   }
-// }
-
-// function handleUpdateTargetPath(newPath) {
-//   targetPath.value = newPath;
-// }
 
 
 // 构建文件结构的函数
 function buildFileStructure() {
   const structure = {};
   // 这里实现构建文件结构的逻辑
-  const currentModuleName = baseSettings.value.moduleName || "abc-module";
-  const currentComponentName = baseSettings.value.componentName || "xyz-component";
+  const currentComponentName = kebabCase(baseSettings.value.componentName) || "xyz-component";
+  const currentModuleName = kebabCase(baseSettings.value.moduleName) || currentComponentName || "abc-module";
 
   // 获取目标路径作为根节点
   const targetPathValue = targetPath.value;
   const rootPath = targetPathValue.replace(/\\/g, "/").split("/").pop() || "root";
+  structure[rootPath] = {};
 
   // 先构建基础结构
   let baseStructure = {
@@ -113,26 +99,19 @@ function buildFileStructure() {
       [`${currentComponentName}.component.html`]: "file",
       [`${currentComponentName}.component.less`]: "file",
       [`${currentComponentName}.component.ts`]: "file",
+      ["detail"]: {
+        [`${currentComponentName}-detail.component.html`]: "file",
+        [`${currentComponentName}-detail.component.less`]: "file",
+        [`${currentComponentName}-detail.component.ts`]: "file",
+      },
     },
   };
 
   // 如果勾选新增按钮或编辑按钮，添加详情组件
-  if (pageSettings.value.buttonConfig.hasAddButton || pageSettings.value.tableConfig.hasTableEditButton) {
-    baseStructure = {
-      [currentComponentName]: {
-        [`${currentComponentName}.component.html`]: "file",
-        [`${currentComponentName}.component.less`]: "file",
-        [`${currentComponentName}.component.ts`]: "file",
-        ["detail"]: {
-          [`${currentComponentName}-detail.component.html`]: "file",
-          [`${currentComponentName}-detail.component.less`]: "file",
-          [`${currentComponentName}-detail.component.ts`]: "file",
-        },
-      },
-    };
+  if (!pageSettings.value.buttonConfig.hasAddButton && !pageSettings.value.tableConfig.hasTableEditButton) {
+    delete baseStructure[currentComponentName]["detail"];
   }
 
-  structure[rootPath] = {};
 
   // 如果勾选生成模块
   if (baseSettings.value.generateModule) {
@@ -155,6 +134,10 @@ function buildFileStructure() {
         [`${currentModuleName}.const.ts`]: "file",
       };
     }
+  } else {
+    structure[rootPath] = {
+      ...baseStructure
+    };
   }
 
   return structure;

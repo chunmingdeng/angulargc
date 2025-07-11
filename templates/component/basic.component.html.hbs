@@ -145,8 +145,8 @@
         [nyStyle]="{width: '100%', height: tableHeight + 'px'}"
         [getRowId]="getRowId"
         [columnDefs]="columnDefs"
-        [rowData]="listOfData"
-        [loading]="tableLoading"
+        [rowData]="table.list"
+        [loading]="table.loading"
         (tableReadyChange)="onGridReady($event)"
         {{#if table.hasSelection}}
         (selectionChanged)="onSelectionChanged($event)"
@@ -154,8 +154,8 @@
     >
     </yzf-enhance-table>
     {{else}}
-    <nz-table #fixedTable [nzData]="listOfData" [nzScroll]="{x: '1170px', y: tableHeight + 'px'}" [nzShowPagination]=false
-        [nzFrontPagination]=false [nzNoResult]="listEmpty" [nzLoading]="tableLoading" [nzBordered]="false"
+    <nz-table #fixedTable [nzData]="table.list" [nzScroll]="{x: '1170px', y: tableHeight + 'px'}" [nzShowPagination]=false
+        [nzFrontPagination]=false [nzNoResult]="listEmpty" [nzLoading]="table.loading" [nzBordered]="false"
         class="no-border-table">
         <thead>
             <tr>
@@ -283,20 +283,34 @@
     <!-- 左 -->
     <div class="showTotal">
         <span *ngIf="selectedCount > 0">已选择 \{{selectedCount}} 条，</span>
-        <span *ngIf="selectedCount === 0">显示 \{{listOfData.length}} 条，</span>
-        <span>共 \{{total}} 条</span>
+        <span *ngIf="selectedCount === 0">显示 \{{table.list.length}} 条，</span>
+        <span>共 \{{pg.total}} 条</span>
     </div>
     <!-- 右 -->
-    <nz-pagination [(nzPageIndex)]="pageNumber" [nzSize]="'small'" [(nzPageSize)]="pageSize"
-        [nzPageSizeOptions]="[30, 50, 100]" [nzTotal]="total||0" (nzPageIndexChange)="refreshData(false, false)"
-        (nzPageSizeChange)="refreshData(true, false)" nzShowSizeChanger nzShowQuickJumper></nz-pagination>
+    <nz-pagination
+        nzSize="small"
+        [(nzPageIndex)]="pageNumber"
+        [(nzPageSize)]="pageSize"
+        [nzTotal]="pg.total"
+        [nzPageSizeOptions]="[30, 50, 100]"
+        (nzPageIndexChange)="refreshData(false, false)"
+        (nzPageSizeChange)="refreshData(true, false)"
+        nzShowSizeChanger
+        nzShowQuickJumper></nz-pagination>
     {{else}}
     <!-- 左 -->
-    <div class="showTotal">显示 \{{listOfData.length}} 条，共 \{{total}} 条</div>
+    <div class="showTotal">显示 \{{table.list.length}} 条，共 \{{pg.total}} 条</div>
     <!-- 右 -->
-    <nz-pagination [(nzPageIndex)]="pageNumber" [nzSize]="'small'" [(nzPageSize)]="pageSize"
-        [nzPageSizeOptions]="[30, 50, 100]" [nzTotal]="total||0" (nzPageIndexChange)="refreshData()"
-        (nzPageSizeChange)="refreshData(true)" nzShowSizeChanger nzShowQuickJumper></nz-pagination>
+    <nz-pagination
+        [(nzPageIndex)]="pg.page"
+        [nzSize]="'small'"
+        [(nzPageSize)]="pg.size"
+        [nzPageSizeOptions]="[30, 50, 100]"
+        [nzTotal]="pg.total"
+        (nzPageIndexChange)="refreshData()"
+        (nzPageSizeChange)="refreshData(true)"
+        nzShowSizeChanger
+        nzShowQuickJumper></nz-pagination>
     {{/if}}
 </ng-template>
 

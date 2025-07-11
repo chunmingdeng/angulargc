@@ -72,7 +72,8 @@
     "watch-tests": "tsc -p . -w --outDir out",
     "pretest": "pnpm run compile-tests && pnpm run compile && pnpm run lint",
     "lint": "eslint src",
-    "test": "vscode-test"
+    "test": "vscode-test",
+    "build": "vsce package"
   },
   "devDependencies": {
     "@types/change-case": "^2.3.5",
